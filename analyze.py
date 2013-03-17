@@ -5,6 +5,11 @@ import pprint
 import sys
 import zlib
 import ZODB.FileStorage
+import ZODB.serialize
+
+class DummyCache(object):
+    def get(self, key, default): return default
+    def new_ghost(self, *args): pass
 
 def main(args=None):
     if args is None:
@@ -28,12 +33,14 @@ def main(args=None):
                         results[self.__class__.__name__][name][
                             str(type(value))].add(value)
 
-    def find_global(module, name):
+    def find_global(conn, module, name):
         name = module + '.' + name
         return Object.__class__(name, (Object, ), {})
 
     [inp] = args
     it = ZODB.FileStorage.FileIterator(inp)
+    reader = ZODB.serialize.ObjectReader(cache=DummyCache(),
+                                         factory=find_global)
     for transaction in it:
         for record in transaction:
             if record.data:
@@ -41,14 +48,7 @@ def main(args=None):
                 data = record.data
                 if data.startswith('.z'):
                     data = zlib.decompress(data[2:])
-                u = cPickle.Unpickler(cStringIO.StringIO(data))
-                u.persistent_load = lambda x: None
-                u.find_global = find_global
-                class_ = u.load()
-                if isinstance(class_, tuple):
-                    class_ = class_[0]
-                state = u.load()
-                class_.__new__(class_).__setstate__(state)
+                reader.setGhostState(reader.getGhost(data), data)
 
     results = {
         cname: {
