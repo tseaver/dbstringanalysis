@@ -13,7 +13,7 @@ def main(args=None):
     # {class {attr -> {value -> count}}}
     results = collections.defaultdict(      # class ->
         lambda : collections.defaultdict(            # addr ->
-            lambda : collections.defaultdict(int)))  # value -> count
+            lambda : collections.defaultdict(set)))  # type(value) -> value
 
     class Object(object):
 
@@ -26,7 +26,7 @@ def main(args=None):
                 for name, value in state.items():
                     if value is None or isinstance(value, basestring):
                         results[self.__class__.__name__][name][
-                            str(type(value)) if value else value] += 1
+                            str(type(value))].add(value)
 
     def find_global(module, name):
         name = module + '.' + name
@@ -53,10 +53,10 @@ def main(args=None):
     results = {
         cname: {
             aname: dict(av)
-            for (aname, av) in cv.items()}
+            for (aname, av) in cv.items() if len(av) > 1}
         for (cname, cv) in results.items()}
 
-    pprint.pprint(results)
+    pprint.pprint({cname: v for cname, v in results.items() if v})
 
 if __name__ == '__main__':
     main()
